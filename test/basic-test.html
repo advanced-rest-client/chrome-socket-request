@@ -1,0 +1,223 @@
+<!doctype html>
+<!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../web-component-tester/browser.js"></script>
+    <script src="../../iron-test-helpers/test-helpers.js"></script>
+    <script src="stub.js"></script>
+    <link rel="import" href="../chrome-socket-request.html">
+  </head>
+  <body>
+
+    <test-fixture id="basic">
+      <template>
+        <chrome-socket-request></chrome-socket-request>
+      </template>
+    </test-fixture>
+
+    <script>
+    /* global fixture, assert */
+    suite('_updateLatestRequest()', function() {
+      var element;
+      var request;
+      setup(function() {
+        element = fixture('basic');
+        request = {
+          url: 'http://domain.com',
+          headers: 'x-header: x-value\nx-other: value'
+        };
+      });
+      test('Creates a GET request object', function() {
+        request.method = 'GET';
+        element._updateLatestRequest(request);
+        assert.ok(element.latestRequest);
+      });
+      test('Creates a GET request object when payload is set', function() {
+        request.method = 'GET';
+        request.payload = 'test';
+        element._updateLatestRequest(request);
+        assert.ok(element.latestRequest);
+      });
+      test('Creates a POST request object when payload is set', function() {
+        request.method = 'POST';
+        request.payload = 'test';
+        element._updateLatestRequest(request);
+        assert.ok(element.latestRequest);
+        return element.latestRequest.text()
+        .then(function(text) {
+          assert.equal(text, 'test');
+        });
+      });
+    });
+    suite('_readTimeout()', function() {
+      var element;
+      setup(function() {
+        element = fixture('basic');
+      });
+      test('Returns promise', function() {
+        var result = element._readTimeout();
+        assert.typeOf(result, 'promise');
+      });
+      test('Resolves as number of miliseconds', function() {
+        return element._readTimeout()
+        .then(time => assert.equal(time, 1000));
+      });
+    });
+
+    suite('_prepareRequest()', function() {
+      var element;
+      var request;
+      const TIMEOUT = 1000;
+
+      suite('Without payload', function() {
+        setup(function() {
+          element = fixture('basic');
+          request = {
+            url: 'http://domain.com',
+            headers: 'x-header: x-value\nx-other: value',
+            method: 'GET',
+            auth: {}
+          };
+        });
+
+        test('Produces valid init object', function() {
+          var result = element._prepareRequest(request, TIMEOUT);
+          assert.equal(result.method, request.method);
+          assert.equal(result.timeout, TIMEOUT);
+          assert.isTrue(result.headers instanceof Object);
+          assert.isUndefined(result.body);
+          assert.typeOf(result.auth, 'object');
+          assert.isFalse(result.debug);
+        });
+
+        test('Removes body from the request', function() {
+          var obj = Object.assign({
+            body: 'test'
+          }, request);
+          var result = element._prepareRequest(obj, TIMEOUT);
+          assert.isUndefined(result.body);
+        });
+      });
+
+      suite('With payload', function() {
+        var file;
+        setup(function() {
+          element = fixture('basic');
+          file = new Blob(['test'], {type: 'text/plain'});
+          request = {
+            url: 'http://domain.com',
+            headers: 'x-header: x-value\nx-other: value',
+            method: 'POST',
+            payload: file
+          };
+        });
+
+        test('Adds body to the init object', function() {
+          var result = element._prepareRequest(request, TIMEOUT);
+          assert.equal(result.body, file);
+        });
+      });
+    });
+
+    suite('_processResponse()', function() {
+      var element;
+      var response;
+      setup(function() {
+        element = fixture('basic');
+        response = {
+          redirects: [],
+          _response: new Response('test', {status: 200}),
+          stats: {
+            receive: 2,
+            startTime: 1
+          },
+          auth: 'TEST'
+        };
+        element._setConnection({
+          _request: {
+            messageSent: 'test-message'
+          }
+        });
+        element._setLatestRequest({});
+      });
+      test('Fires response-ready custom event', function(done) {
+        var callback = function() {
+          element.removeEventListener('response-ready', callback);
+          done();
+        };
+        element.addEventListener('response-ready', callback);
+        element._processResponse(response);
+      });
+      test('response-ready custom event contains response data', function(done) {
+        var callback = function(e) {
+          element.removeEventListener('response-ready', callback);
+          let data = e.detail;
+          assert.isFalse(data.isXhr);
+          assert.isTrue(data.response instanceof Object);
+          assert.isTrue(data.request instanceof Object);
+          assert.equal(data.loadingTime, 1);
+          assert.typeOf(data.timings, 'object');
+          assert.equal(data.auth, 'TEST');
+          done();
+        };
+        element.addEventListener('response-ready', callback);
+        element._processResponse(response);
+      });
+      test('response-ready event can be canceled', function(done) {
+        var callback = function(e) {
+          element.removeEventListener('response-ready', callback);
+          assert.isTrue(e.cancelable);
+          done();
+        };
+        element.addEventListener('response-ready', callback);
+        element._processResponse(response);
+      });
+      test('Fires report-response custom event', function(done) {
+        var callback = function() {
+          element.removeEventListener('report-response', callback);
+          done();
+        };
+        element.addEventListener('report-response', callback);
+        element._processResponse(response);
+      });
+      test('report-response custom event contains response data', function(done) {
+        var callback = function(e) {
+          element.removeEventListener('report-response', callback);
+          let data = e.detail;
+          assert.isFalse(data.isXhr);
+          assert.isTrue(data.response instanceof Object);
+          assert.isTrue(data.request instanceof Object);
+          assert.equal(data.loadingTime, 1);
+          assert.typeOf(data.timings, 'object');
+          assert.equal(data.auth, 'TEST');
+          done();
+        };
+        element.addEventListener('report-response', callback);
+        element._processResponse(response);
+      });
+      test('report-response event cannot be canceled', function(done) {
+        var callback = function(e) {
+          element.removeEventListener('report-response', callback);
+          assert.isFalse(e.cancelable);
+          done();
+        };
+        element.addEventListener('report-response', callback);
+        element._processResponse(response);
+      });
+    });
+    </script>
+
+  </body>
+</html>
