@@ -234,13 +234,15 @@ Polymer({
     const connection = new SocketFetch(url, init);
     this._addConnectionHandlers(connection);
 
-    this.connection = connection;
+    this._setConnection(connection);
     try {
       return connection.fetch()
-      .then((response) => {
-        window.requestAnimationFrame(() => {
-          this._processResponse(response);
-        });
+      .then(response => this._processResponse(response))
+      .catch(cause => {
+        let data = {
+          error: cause
+        };
+        this._processResponse(data);
       });
     } catch (e) {
       this.fire('app-log', {
@@ -275,7 +277,7 @@ Polymer({
     connection.removeEventListener('firstbyte', this.__firstByteHandler);
     connection.removeEventListener('loadend', this.__requestLoadEndHandler);
     connection.removeEventListener('sendheaders', this.__headersSentHandler);
-    connection.removeEventListener('headers-received', this.__headersReceivedHandler);
+    connection.removeEventListener('headersreceived', this.__headersReceivedHandler);
     connection.removeEventListener('beforeredirect', this.__beforeRedirectHandler);
   },
 
@@ -340,7 +342,7 @@ Polymer({
     } else {
       detail.response = data._response;
       detail.sourceMessage = this.connection._request.messageSent;
-      detail.loadingTime = data.stats.receive - data.stats.startTime;
+      detail.loadingTime = this._computeLoadingTime(data.stats);
       detail.timings = data.stats;
       detail.auth = data.auth;
     }
@@ -404,6 +406,33 @@ Polymer({
       };
     });
     return Object.create(Object.prototype, configuration);
+  },
+  /**
+   * Computes a request / response loading time from the stats object
+   * @param {Objject} stats A stats property of the socket client response.
+   * @return {Number} A time to full response in miliseconds. 0 if stats unavailable.
+   */
+  _computeLoadingTime: function(stats) {
+    if (!stats) {
+      return 0;
+    }
+    var value = 0;
+    if (stats.connect && stats.connect > 0) {
+      value += stats.connect;
+    }
+    if (stats.receive && stats.receive > 0) {
+      value += stats.receive;
+    }
+    if (stats.send && stats.send > 0) {
+      value += stats.send;
+    }
+    if (stats.ssl && stats.ssl > 0) {
+      value += stats.ssl;
+    }
+    if (stats.wait && stats.wait > 0) {
+      value += stats.wait;
+    }
+    return value;
   }
 });
 </script>
