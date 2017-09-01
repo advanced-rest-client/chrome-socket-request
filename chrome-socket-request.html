@@ -275,7 +275,7 @@ Polymer({
     connection.removeEventListener('firstbyte', this.__firstByteHandler);
     connection.removeEventListener('loadend', this.__requestLoadEndHandler);
     connection.removeEventListener('sendheaders', this.__headersSentHandler);
-    connection.removeEventListener('headers-received', this.__headersReceivedHandler);
+    connection.removeEventListener('headersreceived', this.__headersReceivedHandler);
     connection.removeEventListener('beforeredirect', this.__beforeRedirectHandler);
   },
 
