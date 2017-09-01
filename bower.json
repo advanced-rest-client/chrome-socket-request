@@ -1,7 +1,7 @@
 {
   "name": "chrome-socket-request",
   "description": "Wrapper element for the SocketFetch libraty to make a HTTP connection in Chrome",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "Apache-2.0 OR CC-BY-4.0",
   "authors": [
     "The Advanced REST client authors <arc@mulesoft.com>"
