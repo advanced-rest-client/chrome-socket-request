@@ -342,7 +342,7 @@ Polymer({
     } else {
       detail.response = data._response;
       detail.sourceMessage = this.connection._request.messageSent;
-      detail.loadingTime = data.stats.receive - data.stats.startTime;
+      detail.loadingTime = this._computeLoadingTime(data.stats);
       detail.timings = data.stats;
       detail.auth = data.auth;
     }
@@ -406,6 +406,33 @@ Polymer({
       };
     });
     return Object.create(Object.prototype, configuration);
+  },
+  /**
+   * Computes a request / response loading time from the stats object
+   * @param {Objject} stats A stats property of the socket client response.
+   * @return {Number} A time to full response in miliseconds. 0 if stats unavailable.
+   */
+  _computeLoadingTime: function(stats) {
+    if (!stats) {
+      return 0;
+    }
+    var value = 0;
+    if (stats.connect && stats.connect > 0) {
+      value += stats.connect;
+    }
+    if (stats.receive && stats.receive > 0) {
+      value += stats.receive;
+    }
+    if (stats.send && stats.send > 0) {
+      value += stats.send;
+    }
+    if (stats.ssl && stats.ssl > 0) {
+      value += stats.ssl;
+    }
+    if (stats.wait && stats.wait > 0) {
+      value += stats.wait;
+    }
+    return value;
   }
 });
 </script>
