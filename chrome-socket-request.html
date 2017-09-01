@@ -234,13 +234,15 @@ Polymer({
     const connection = new SocketFetch(url, init);
     this._addConnectionHandlers(connection);
 
-    this.connection = connection;
+    this._setConnection(connection);
     try {
       return connection.fetch()
-      .then((response) => {
-        window.requestAnimationFrame(() => {
-          this._processResponse(response);
-        });
+      .then(response => this._processResponse(response))
+      .catch(cause => {
+        let data = {
+          error: cause
+        };
+        this._processResponse(data);
       });
     } catch (e) {
       this.fire('app-log', {
