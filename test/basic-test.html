@@ -151,6 +151,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
         element._setLatestRequest({});
+        element._setRequestId('TEST-id');
       });
       test('Fires response-ready custom event', function(done) {
         var callback = function() {
@@ -167,9 +168,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           assert.isFalse(data.isXhr);
           assert.isTrue(data.response instanceof Object);
           assert.isTrue(data.request instanceof Object);
-          assert.equal(data.loadingTime, 1);
+          assert.equal(data.loadingTime, 2);
           assert.typeOf(data.timings, 'object');
           assert.equal(data.auth, 'TEST');
+          assert.equal(data.id, 'TEST-id');
           done();
         };
         element.addEventListener('response-ready', callback);
@@ -199,9 +201,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           assert.isFalse(data.isXhr);
           assert.isTrue(data.response instanceof Object);
           assert.isTrue(data.request instanceof Object);
-          assert.equal(data.loadingTime, 1);
+          assert.equal(data.loadingTime, 2);
           assert.typeOf(data.timings, 'object');
           assert.equal(data.auth, 'TEST');
+          assert.equal(data.id, 'TEST-id');
           done();
         };
         element.addEventListener('report-response', callback);

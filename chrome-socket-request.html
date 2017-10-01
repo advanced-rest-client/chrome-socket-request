@@ -14,7 +14,6 @@ the License.
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../headers-parser-behavior/headers-parser-behavior.html">
 <link rel="import" href="../socket-fetch/socket-fetch.html">
-
 <!--
 Wrapper element for the SocketFetch libraty to make a HTTP connection in Chrome
 
@@ -66,7 +65,12 @@ Polymer({
      * If set the `SocketFetch` transport library produce debug output in
      * the console.
      */
-    debug: Boolean
+    debug: Boolean,
+    // Request ID to report with the response.
+    requestId: {
+      type: String,
+      readOnly: true
+    }
   },
 
   /**
@@ -81,6 +85,7 @@ Polymer({
     }
     this.aborted = false;
     this._updateLatestRequest(request);
+    this._setRequestId(request.id);
     return this._readTimeout()
     .then(timeout => this._prepareRequest(request, timeout))
     .then(init => this._makeConnection(request.url, init))
@@ -257,6 +262,7 @@ Polymer({
     if (this.__firstByteHandler) {
       return;
     }
+    this.__loadStartHandler = this._notifyLoadStart.bind(this);
     this.__firstByteHandler = this._notifyFirstByte.bind(this);
     this.__requestLoadEndHandler = this._notifyRequestLoadEnd.bind(this);
     this.__headersSentHandler = this._notifyRequestHeadersSent.bind(this);
@@ -266,6 +272,7 @@ Polymer({
 
   _addConnectionHandlers: function(connection) {
     this._prepareEventHandlers();
+    connection.addEventListener('loadstart', this.__loadStartHandler);
     connection.addEventListener('firstbyte', this.__firstByteHandler);
     connection.addEventListener('loadend', this.__requestLoadEndHandler);
     connection.addEventListener('sendheaders', this.__headersSentHandler);
@@ -274,6 +281,7 @@ Polymer({
   },
 
   _removeConnectionHandlers: function(connection) {
+    connection.removeEventListener('loadstart', this.__loadStartHandler);
     connection.removeEventListener('firstbyte', this.__firstByteHandler);
     connection.removeEventListener('loadend', this.__requestLoadEndHandler);
     connection.removeEventListener('sendheaders', this.__headersSentHandler);
@@ -281,13 +289,24 @@ Polymer({
     connection.removeEventListener('beforeredirect', this.__beforeRedirectHandler);
   },
 
-  _notifyFirstByte: function(e) {
-    this.fire('request-first-byte-received', e.detail);
+  _notifyLoadStart: function() {
+    this.fire('request-load-start', {
+      id: this.requestId
+    });
   },
-  _notifyRequestLoadEnd: function(e) {
-    this.fire('request-load-end', e.detail);
+
+  _notifyFirstByte: function() {
+    this.fire('request-first-byte-received', {
+      id: this.requestId
+    });
+  },
+  _notifyRequestLoadEnd: function() {
+    this.fire('request-load-end', {
+      id: this.requestId
+    });
   },
   _notifyRequestHeadersSent: function(e) {
+    e.detail.id = this.requestId;
     this.fire('request-headers-sent', e.detail);
   },
   /**
@@ -297,7 +316,7 @@ Polymer({
     e.stopPropagation();
     var event = this.fire('headers-received', {
       value: e.detail.value,
-      id: e.detail.id
+      id: this.requestId
     }, {
       cancelable: true
     });
@@ -310,8 +329,8 @@ Polymer({
   _notifyBeforeRedirect: function(e) {
     e.stopPropagation();
     var event = this.fire('before-redirect', {
-      url: e.detail.value,
-      id: e.detail.id
+      url: e.detail.location,
+      id: this.requestId
     }, {
       cancelable: true
     });
@@ -320,7 +339,7 @@ Polymer({
       this.abort();
     }
   },
-
+  // Prepares the response to report.
   _processResponse: function(data) {
     if (this.aborted) {
       this._setLatestRequest(undefined);
@@ -346,9 +365,16 @@ Polymer({
       detail.timings = data.stats;
       detail.auth = data.auth;
     }
+    detail.id = this.requestId;
     this._beforeResponse(detail);
+    this._clear();
+    this.aborted = false;
   },
-
+  /**
+   * Processes redirects data from the socket library.
+   * @param {Set} set A set of redirects
+   * @return {Object} Map of arrays of timings and redirects information.
+   */
   _processRedirects: function(set) {
     var result = {
       timings: [],
@@ -380,7 +406,7 @@ Polymer({
     this._reportResponse(event.detail);
   },
   /**
-   * Fires the `response-ready` custom event with immutable response data.
+   * Fires the `report-response` custom event with immutable response data.
    * @param {Object} detail The event detail object.
    */
   _reportResponse: function(detail) {
@@ -434,5 +460,106 @@ Polymer({
     }
     return value;
   }
+
+  /**
+   * Fired when the response is fully processed and ready to be reported in the
+   * UI.
+   * The detail object contains immutable properties so any event handler can't
+   * change it's values. To change response data handle `response-ready` event.
+   *
+   * The event has the same properties as `response-ready` event.
+   *
+   * @event report-response
+   */
+  /**
+   * Event fired when the transport library finished a request and both
+   * request and response objects are ready.
+   *
+   * Event is fired just before reporting the response to the user.
+   * It can be cancelled and the response won't be presented to the user.
+   * The element that cancels the response should take an action that is visible
+   * to the user (eg, redirect, chain request etc). This event is synchronous
+   * so any async work on the response object won't be possible.
+   *
+   * The request and response are Fetch's API Request and Response object.
+   * Body from both of the objects can be read only once so any handler
+   * that have to read the response / request body have to call `clone()`
+   * function that returns new `Body` (either `Request` or `Response`) object
+   * that can be read. If the handler use the body without cloning the object
+   * the response won't be reported to the user and response view will report
+   * an error.
+   *
+   * @event response-ready
+   * @param {Request} request The request object as defined in the Fetch API spec.
+   * @param {Response} response The response object as defined in the Fetch API spec.
+   * @param {Boolean} isXhr If not set the element assumes it's true. Indicates
+   * if the transport method doesn't support advanced timings and redirects
+   * information. See below.
+   * @param {Error} error When the request / response is errored
+   * (request.ok equals false) then the error object should be set with the
+   * human readable message that will be displayed to the user.
+   * @param {Number} loadingTime The response full loading time
+   * @param {Object} timings HAR 1.2 timings object
+   * @param {Array} redirectTimings Array of `timings` objects with timings of each
+   * redirect. Elements in the array are ordered and each item corresponds
+   * to the one in `redirects` array
+   * @param {Array} redirects Array of `Response` objects. Elements in the array
+   * are ordered and each item corresponds to the one in `redirectsTimings` array.
+   * Additionally the Response item should have a `requestUrl` property which
+   * is the URL to which the redirected request went to.
+   * @param {String} sourceMessage A source message that has been sent to the
+   * server.
+   * @param {Object} auth Returned by the transport library auth object
+   * @param {String} id Request ID generated on send.
+   */
+
+  /**
+   * Fired when socket library reported receiving first byte of information
+   * from server.
+   *
+   * @event request-first-byte-received
+   * @param {String} id Request ID generated on send.
+   */
+
+  /**
+   * Fired when the message has been sent to the server.
+   *
+   * @event request-load-start
+   * @param {String} id Request ID generated on send.
+   */
+
+  /**
+   * Fired when response is loaded.
+   *
+   * @event request-load-end
+   * @param {String} id Request ID generated on send.
+   */
+  /**
+   * Fired when headers were sent.
+   *
+   * @event request-headers-sent
+   * @param {Number} bytesWritten Number of bytes sent to the socket
+   * @param {String} id Request ID generated on send.
+   */
+  /**
+   * Fired when headers were received from the server.
+   *
+   * This event ins cancelable and if `preventDefault()` has been called on this
+   * event then the request is aborted.
+   *
+   * @event headers-received
+   * @param {String} value Received headers string
+   * @param {String} id Request ID generated on send.
+   */
+  /**
+   * Fired when redirect is about to occur.
+   *
+   * This event ins cancelable and if `preventDefault()` has been called on this
+   * event then the request is aborted.
+   *
+   * @event before-redirect
+   * @param {String} url The url where the request is being redirected
+   * @param {String} id Request ID generated on send.
+   */
 });
 </script>
