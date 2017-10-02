@@ -1,3 +1,17 @@
+<a name="0.0.5"></a>
+## [0.0.5](https://github.com/advanced-rest-client/chrome-socket-request/compare/0.0.3...0.0.5) (2017-10-01)
+
+
+### Docs
+
+* Added documentation for events ([e7b72d14adc2b36ab1a996be0e5d70fb6ce06afb](https://github.com/advanced-rest-client/chrome-socket-request/commit/e7b72d14adc2b36ab1a996be0e5d70fb6ce06afb))
+
+### New
+
+* Added support for request ID. ([aa4696ce57ef3a77866759f689aa3ab20afee84b](https://github.com/advanced-rest-client/chrome-socket-request/commit/aa4696ce57ef3a77866759f689aa3ab20afee84b))
+
+
+
 <a name="0.0.4"></a>
 ## [0.0.4](https://github.com/advanced-rest-client/chrome-socket-request/compare/0.0.3...0.0.4) (2017-09-01)
 
