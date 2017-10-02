@@ -1,3 +1,13 @@
+<a name="0.1.1"></a>
+## [0.1.1](https://github.com/advanced-rest-client/chrome-socket-request/compare/0.0.5...0.1.1) (2017-10-02)
+
+
+### Update
+
+* Updating version of the socket fetch library ([1eacc4831b1fb9127dcb363be1d318ec18ff328e](https://github.com/advanced-rest-client/chrome-socket-request/commit/1eacc4831b1fb9127dcb363be1d318ec18ff328e))
+
+
+
 <a name="0.0.5"></a>
 ## [0.0.5](https://github.com/advanced-rest-client/chrome-socket-request/compare/0.0.3...0.0.5) (2017-10-01)
 
